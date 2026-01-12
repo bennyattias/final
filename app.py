@@ -183,7 +183,13 @@ def upload():
     
     except Exception as e:
         print(f"Error processing upload: {e}")
-        return jsonify({'error': f'Error processing image: {str(e)}'}), 500
+        import traceback
+        traceback.print_exc()
+        # Always return valid JSON, even on error
+        return jsonify({
+            'success': False,
+            'error': f'Error processing image: {str(e)}'
+        }), 500
 
 @app.route('/images/<filename>')
 def serve_image(filename):

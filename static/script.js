@@ -52,7 +52,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: formData
                 });
                 
-                const data = await response.json();
+                // Check if response is JSON
+                let data;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    try {
+                        data = await response.json();
+                    } catch (e) {
+                        // If JSON parsing fails, get text response
+                        const text = await response.text();
+                        throw new Error(`Server error: ${text || 'Invalid response'}`);
+                    }
+                } else {
+                    // Not JSON, get text response
+                    const text = await response.text();
+                    throw new Error(`Server error: ${text || 'Invalid response format'}`);
+                }
                 
                 if (!response.ok) {
                     throw new Error(data.error || 'Upload failed');
