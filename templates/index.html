@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero">
+    <div class="container">
+        <h1>Shaggy Dog Transformer</h1>
+        <p class="hero-description">
+            Upload your photo and watch as AI transforms you into your perfect dog alter-ego! 
+            Experience the magical transformation through three stages, from human to your canine counterpart.
+        </p>
+        <div class="hero-buttons">
+            <a href="{{ url_for('login') }}" class="btn btn-primary">Login</a>
+            <a href="{{ url_for('register') }}" class="btn btn-secondary">Register</a>
+        </div>
+    </div>
+</div>
+
+<div class="features">
+    <div class="container">
+        <h2>How It Works</h2>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>1. Upload</h3>
+                <p>Upload a clear photo of yourself</p>
+            </div>
+            <div class="feature-card">
+                <h3>2. Analyze</h3>
+                <p>AI determines your perfect dog breed match</p>
+            </div>
+            <div class="feature-card">
+                <h3>3. Transform</h3>
+                <p>Watch the magical transformation in three stages</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

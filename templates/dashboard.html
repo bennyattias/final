@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Shaggy Dog Transformer{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="container">
+        <h2>Welcome, {{ username }}!</h2>
+        
+        <div class="upload-section">
+            <h3>Upload New Photo</h3>
+            <form id="upload-form" enctype="multipart/form-data">
+                <div class="form-group">
+                    <input type="file" id="image-input" name="image" accept="image/*" required>
+                    <label for="image-input" class="file-label">Choose Image</label>
+                </div>
+                <button type="submit" class="btn btn-primary">Transform Me!</button>
+            </form>
+            <div id="loading-spinner" class="loading-spinner" style="display: none;">
+                <div class="spinner"></div>
+                <p>Transforming your image... This may take a minute.</p>
+            </div>
+            <div id="error-message" class="error-message" style="display: none;"></div>
+        </div>
+
+        <div class="gallery-section">
+            <h3>Your Transformations</h3>
+            {% if images %}
+            <div class="image-gallery" id="image-gallery">
+                {% for image in images %}
+                <div class="image-card">
+                    <h4>Breed: {{ image.dog_breed or 'Unknown' }}</h4>
+                    <div class="image-stages">
+                        <div class="image-stage">
+                            <label>Original</label>
+                            <img src="{{ url_for('serve_image', filename=image.original_image) }}" alt="Original">
+                        </div>
+                        {% if image.transition1_image %}
+                        <div class="image-stage">
+                            <label>Transition 1</label>
+                            <img src="{{ url_for('serve_image', filename=image.transition1_image) }}" alt="Transition 1">
+                        </div>
+                        {% endif %}
+                        {% if image.transition2_image %}
+                        <div class="image-stage">
+                            <label>Transition 2</label>
+                            <img src="{{ url_for('serve_image', filename=image.transition2_image) }}" alt="Transition 2">
+                        </div>
+                        {% endif %}
+                        {% if image.final_dog_image %}
+                        <div class="image-stage">
+                            <label>Final Dog</label>
+                            <img src="{{ url_for('serve_image', filename=image.final_dog_image) }}" alt="Final Dog">
+                        </div>
+                        {% endif %}
+                    </div>
+                    <p class="image-date">{{ image.created_at }}</p>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="no-images">No transformations yet. Upload your first photo to get started!</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
