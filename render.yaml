@@ -3,7 +3,7 @@ services:
     name: shaggy-dog
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn --timeout 120 --workers 2 --threads 4 --bind 0.0.0.0:$PORT app:app
     envVars:
       - key: OPENAI_API_KEY
         sync: false

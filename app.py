@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import database
 import openai_generator
 from datetime import datetime
+import threading
 
 # Load environment variables from .env file
 load_dotenv()
@@ -115,6 +116,43 @@ def dashboard():
     user_images = database.get_user_images(current_user.id)
     return render_template('dashboard.html', images=user_images, username=current_user.username)
 
+def process_image_generation(filepath, filename, breed, user_id, timestamp, image_id):
+    """Background function to generate transformation images"""
+    try:
+        print(f"Background: Starting image generation for {filename}")
+        
+        # Generate transformation images using DALL-E 3
+        print("Background: Starting image generation with DALL-E 3...")
+        trans1_path, final_path, full_dog_path = openai_generator.generate_transformation_images(
+            filepath, breed, user_id, timestamp
+        )
+        
+        print(f"Background: Generated images - Trans1: {trans1_path}, Final: {final_path}, Full Dog: {full_dog_path}")
+        
+        # Check if files actually exist
+        trans1_exists = trans1_path and os.path.exists(trans1_path)
+        final_exists = final_path and os.path.exists(final_path)
+        full_dog_exists = full_dog_path and os.path.exists(full_dog_path)
+        
+        print(f"Background: Files exist - Trans1: {trans1_exists}, Final: {final_exists}, Full Dog: {full_dog_exists}")
+        
+        # Update database with generated images
+        if trans1_exists and final_exists and full_dog_exists:
+            # Update the database record with the generated images
+            database.update_image_set(
+                image_id,
+                os.path.basename(trans1_path),
+                os.path.basename(final_path),
+                os.path.basename(full_dog_path)
+            )
+            print(f"Background: Successfully updated database for image_id {image_id}")
+        else:
+            print(f"Background: WARNING - Not all images generated. Trans1: {trans1_exists}, Final: {final_exists}, Full Dog: {full_dog_exists}")
+    except Exception as e:
+        print(f"Background: Error processing image generation: {e}")
+        import traceback
+        traceback.print_exc()
+
 @app.route('/upload', methods=['POST'])
 @login_required
 def upload():
@@ -138,56 +176,42 @@ def upload():
         # Save original image
         file.save(filepath)
         
-        # Analyze breed using OpenAI GPT-4 Vision
+        # Analyze breed using OpenAI GPT-4 Vision (quick operation)
         print(f"Analyzing breed for image: {filepath}")
         breed = openai_generator.analyze_dog_breed(filepath)
         print(f"Detected breed: {breed}")
         
-        # Generate transformation images using DALL-E 3
-        print("Starting image generation with DALL-E 3...")
-        trans1_path, final_path, full_dog_path = openai_generator.generate_transformation_images(
-            filepath, breed, current_user.id, timestamp
-        )
-        
-        print(f"Generated images - Trans1: {trans1_path}, Final: {final_path}, Full Dog: {full_dog_path}")
-        
-        # Check if files actually exist
-        trans1_exists = trans1_path and os.path.exists(trans1_path)
-        final_exists = final_path and os.path.exists(final_path)
-        full_dog_exists = full_dog_path and os.path.exists(full_dog_path)
-        original_exists = os.path.exists(filepath)
-        
-        print(f"Files exist - Original: {original_exists}, Trans1: {trans1_exists}, Final: {final_exists}, Full Dog: {full_dog_exists}")
-        
-        # Only return response if all 4 images are ready
-        if not (original_exists and trans1_exists and final_exists and full_dog_exists):
-            print("WARNING: Not all images were generated successfully")
-            return jsonify({
-                'success': False,
-                'error': 'Some images failed to generate. Please try again.'
-            }), 500
-        
-        # Save to database
+        # Save initial record to database (without transformation images yet)
         image_id = database.save_image_set(
             current_user.id,
             filename,
             breed,
-            os.path.basename(trans1_path) if trans1_exists else None,
-            os.path.basename(final_path) if final_exists else None,
-            os.path.basename(full_dog_path) if full_dog_exists else None
+            None,  # transition1 - will be updated later
+            None,  # final - will be updated later
+            None   # full_dog - will be updated later
         )
         
-        # Return JSON response with image URLs (all 4 images are ready)
+        # Start background thread for image generation
+        thread = threading.Thread(
+            target=process_image_generation,
+            args=(filepath, filename, breed, current_user.id, timestamp, image_id),
+            daemon=True
+        )
+        thread.start()
+        
+        # Return immediately with original image and processing status
         return jsonify({
             'success': True,
             'image_id': image_id,
             'breed': breed,
+            'status': 'processing',
             'images': {
                 'original': url_for('serve_image', filename=filename),
-                'transition1': url_for('serve_image', filename=os.path.basename(trans1_path)),
-                'final': url_for('serve_image', filename=os.path.basename(final_path)),
-                'full_dog': url_for('serve_image', filename=os.path.basename(full_dog_path))
-            }
+                'transition1': None,
+                'final': None,
+                'full_dog': None
+            },
+            'message': 'Image uploaded successfully. Transformations are being generated in the background.'
         })
     
     except Exception as e:
@@ -198,6 +222,55 @@ def upload():
         return jsonify({
             'success': False,
             'error': f'Error processing image: {str(e)}'
+        }), 500
+
+@app.route('/check-status/<int:image_id>')
+@login_required
+def check_status(image_id):
+    """Check if images are ready for a given image_id"""
+    try:
+        image_data = database.get_image_by_id(image_id)
+        if not image_data or image_data['user_id'] != current_user.id:
+            return jsonify({'error': 'Image not found'}), 404
+        
+        # Check if all images are ready
+        trans1_exists = image_data.get('transition1_image') and os.path.exists(
+            os.path.join(app.config['UPLOAD_FOLDER'], image_data['transition1_image'])
+        )
+        final_exists = image_data.get('final_dog_image') and os.path.exists(
+            os.path.join(app.config['UPLOAD_FOLDER'], image_data['final_dog_image'])
+        )
+        full_dog_exists = image_data.get('transition2_image') and os.path.exists(
+            os.path.join(app.config['UPLOAD_FOLDER'], image_data['transition2_image'])
+        )
+        original_exists = image_data.get('original_image') and os.path.exists(
+            os.path.join(app.config['UPLOAD_FOLDER'], image_data['original_image'])
+        )
+        
+        all_ready = original_exists and trans1_exists and final_exists and full_dog_exists
+        
+        if all_ready:
+            return jsonify({
+                'success': True,
+                'status': 'complete',
+                'images': {
+                    'original': url_for('serve_image', filename=image_data['original_image']),
+                    'transition1': url_for('serve_image', filename=image_data['transition1_image']),
+                    'final': url_for('serve_image', filename=image_data['final_dog_image']),
+                    'full_dog': url_for('serve_image', filename=image_data['transition2_image'])
+                }
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'status': 'processing',
+                'message': 'Images are still being generated...'
+            })
+    except Exception as e:
+        print(f"Error checking status: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500
 
 @app.route('/images/<filename>')

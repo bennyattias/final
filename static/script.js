@@ -73,21 +73,39 @@ document.addEventListener('DOMContentLoaded', function() {
                     throw new Error(data.error || 'Upload failed');
                 }
                 
-                // Success - display new images
+                // Success - handle response
                 if (data.success) {
-                    displayNewImage(data);
+                    if (data.status === 'processing') {
+                        // Images are being generated in background - start polling
+                        // Keep spinner visible while processing
+                        loadingSpinner.querySelector('p').textContent = 'Transformations are being generated... This may take 1-2 minutes.';
+                        startPolling(data.image_id, data.breed, data.images.original);
+                    } else {
+                        // All images ready - display immediately
+                        displayNewImage(data);
+                        // Hide loading spinner
+                        loadingSpinner.style.display = 'none';
+                        uploadForm.style.opacity = '1';
+                        uploadForm.style.pointerEvents = 'auto';
+                    }
                     // Reset form
                     uploadForm.reset();
                 }
-                
+            
             } catch (error) {
                 console.error('Upload error:', error);
                 showError(error.message || 'An error occurred while uploading. Please try again.');
-            } finally {
-                // Hide loading spinner
+                // Hide loading spinner on error
                 loadingSpinner.style.display = 'none';
                 uploadForm.style.opacity = '1';
                 uploadForm.style.pointerEvents = 'auto';
+            } finally {
+                // Only hide spinner if not processing (spinner stays visible during polling)
+                if (!data || data.status !== 'processing') {
+                    loadingSpinner.style.display = 'none';
+                    uploadForm.style.opacity = '1';
+                    uploadForm.style.pointerEvents = 'auto';
+                }
             }
         });
     }
@@ -162,18 +180,129 @@ document.addEventListener('DOMContentLoaded', function() {
         imageCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
     
-    // Progressive image loading for transition images
-    // This function can be called as images are generated
-    function updateImageProgress(imageId, stage, imageUrl) {
-        const imageCard = document.querySelector(`[data-image-id="${imageId}"]`);
-        if (imageCard) {
-            const stageElement = imageCard.querySelector(`[data-stage="${stage}"]`);
-            if (stageElement) {
-                const img = stageElement.querySelector('img');
-                if (img) {
-                    img.src = imageUrl;
+    // Polling function to check if images are ready
+    function startPolling(imageId, breed, originalUrl) {
+        // Create a placeholder card showing "processing"
+        const imageCard = document.createElement('div');
+        imageCard.className = 'image-card';
+        imageCard.setAttribute('data-image-id', imageId);
+        imageCard.innerHTML = `
+            <h4>Breed: ${breed}</h4>
+            <div class="image-stages">
+                <div class="image-stage">
+                    <label>1. Original</label>
+                    <img src="${originalUrl}" alt="Original">
+                </div>
+                <div class="image-stage">
+                    <label>2. Transition</label>
+                    <div style="padding: 2rem; text-align: center; color: #999;">Processing...</div>
+                </div>
+                <div class="image-stage">
+                    <label>3. Final</label>
+                    <div style="padding: 2rem; text-align: center; color: #999;">Processing...</div>
+                </div>
+                <div class="image-stage">
+                    <label>4. Full Dog</label>
+                    <div style="padding: 2rem; text-align: center; color: #999;">Processing...</div>
+                </div>
+            </div>
+            <p class="image-date">Just now - Processing...</p>
+        `;
+        
+        // Add to gallery
+        if (!imageGallery) {
+            const gallerySection = document.querySelector('.gallery-section');
+            if (gallerySection) {
+                const newGallery = document.createElement('div');
+                newGallery.className = 'image-gallery';
+                newGallery.id = 'image-gallery';
+                newGallery.appendChild(imageCard);
+                gallerySection.appendChild(newGallery);
+                
+                const noImages = gallerySection.querySelector('.no-images');
+                if (noImages) {
+                    noImages.remove();
                 }
             }
+        } else {
+            imageGallery.insertBefore(imageCard, imageGallery.firstChild);
+        }
+        
+        // Scroll to new image
+        imageCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        // Poll every 3 seconds
+        let pollCount = 0;
+        const maxPolls = 60; // 3 minutes max (60 * 3 seconds)
+        
+        const pollInterval = setInterval(async () => {
+            pollCount++;
+            
+            try {
+                const response = await fetch(`/check-status/${imageId}`);
+                const statusData = await response.json();
+                
+                if (statusData.success && statusData.status === 'complete') {
+                    // All images ready - update the card
+                    clearInterval(pollInterval);
+                    updateImageCard(imageId, statusData.images, breed);
+                } else if (pollCount >= maxPolls) {
+                    // Timeout - stop polling
+                    clearInterval(pollInterval);
+                    const card = document.querySelector(`[data-image-id="${imageId}"]`);
+                    if (card) {
+                        const dateEl = card.querySelector('.image-date');
+                        if (dateEl) {
+                            dateEl.textContent = 'Processing timeout - please refresh the page';
+                            dateEl.style.color = '#e74c3c';
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Polling error:', error);
+                if (pollCount >= maxPolls) {
+                    clearInterval(pollInterval);
+                }
+            }
+        }, 3000); // Poll every 3 seconds
+    }
+    
+    function updateImageCard(imageId, images, breed) {
+        const imageCard = document.querySelector(`[data-image-id="${imageId}"]`);
+        if (!imageCard) return;
+        
+        imageCard.innerHTML = `
+            <h4>Breed: ${breed}</h4>
+            <div class="image-stages">
+                <div class="image-stage">
+                    <label>1. Original</label>
+                    <img src="${images.original}" alt="Original">
+                </div>
+                <div class="image-stage">
+                    <label>2. Transition</label>
+                    <img src="${images.transition1}" alt="Transition">
+                </div>
+                <div class="image-stage">
+                    <label>3. Final</label>
+                    <img src="${images.final}" alt="Final">
+                </div>
+                <div class="image-stage">
+                    <label>4. Full Dog</label>
+                    <img src="${images.full_dog}" alt="Full Dog">
+                </div>
+            </div>
+            <p class="image-date">Just now</p>
+        `;
+        
+        // Hide loading spinner now that images are ready
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const uploadForm = document.getElementById('upload-form');
+        if (loadingSpinner) {
+            loadingSpinner.style.display = 'none';
+        }
+        if (uploadForm) {
+            uploadForm.style.opacity = '1';
+            uploadForm.style.pointerEvents = 'auto';
         }
     }
 });

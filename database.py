@@ -123,3 +123,37 @@ def get_user_images(user_id):
     conn.close()
     
     return [dict(img) for img in images]
+
+def get_image_by_id(image_id):
+    """Get image by ID"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT id, user_id, original_image, dog_breed, transition1_image, transition2_image, final_dog_image, created_at
+        FROM images
+        WHERE id = ?
+    ''', (image_id,))
+    
+    image = cursor.fetchone()
+    conn.close()
+    
+    if image:
+        return dict(image)
+    return None
+
+def update_image_set(image_id, trans1, final, full_dog):
+    """Update image transformation set in database"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Use transition2_image column for full_dog (to maintain compatibility with existing schema)
+    cursor.execute('''
+        UPDATE images 
+        SET transition1_image = ?, transition2_image = ?, final_dog_image = ?
+        WHERE id = ?
+    ''', (trans1, full_dog, final, image_id))
+    
+    conn.commit()
+    conn.close()
+    return True
