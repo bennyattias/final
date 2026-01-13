@@ -90,15 +90,16 @@ def get_user_by_id(user_id):
         return {'id': user['id'], 'username': user['username']}
     return None
 
-def save_image_set(user_id, original_path, breed, trans1, trans2, final):
+def save_image_set(user_id, original_path, breed, trans1, final, full_dog):
     """Save image transformation set to database"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
+    # Use transition2_image column for full_dog (to maintain compatibility with existing schema)
     cursor.execute('''
         INSERT INTO images (user_id, original_image, dog_breed, transition1_image, transition2_image, final_dog_image)
         VALUES (?, ?, ?, ?, ?, ?)
-    ''', (user_id, original_path, breed, trans1, trans2, final))
+    ''', (user_id, original_path, breed, trans1, full_dog, final))
     
     conn.commit()
     image_id = cursor.lastrowid
@@ -116,6 +117,7 @@ def get_user_images(user_id):
         WHERE user_id = ?
         ORDER BY created_at DESC
     ''', (user_id,))
+    # Note: transition2_image now contains full_dog image, final_dog_image contains final (dog head on human body)
     
     images = cursor.fetchall()
     conn.close()

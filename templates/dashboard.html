@@ -18,7 +18,7 @@
             </form>
             <div id="loading-spinner" class="loading-spinner" style="display: none;">
                 <div class="spinner"></div>
-                <p>Transforming your image... This may take a minute.</p>
+                <p>Transforming your image... Generating all 4 images. This may take a minute.</p>
             </div>
             <div id="error-message" class="error-message" style="display: none;"></div>
         </div>
@@ -32,25 +32,25 @@
                     <h4>Breed: {{ image.dog_breed or 'Unknown' }}</h4>
                     <div class="image-stages">
                         <div class="image-stage">
-                            <label>Original</label>
+                            <label>1. Original</label>
                             <img src="{{ url_for('serve_image', filename=image.original_image) }}" alt="Original">
                         </div>
                         {% if image.transition1_image %}
                         <div class="image-stage">
-                            <label>Transition 1</label>
-                            <img src="{{ url_for('serve_image', filename=image.transition1_image) }}" alt="Transition 1">
-                        </div>
-                        {% endif %}
-                        {% if image.transition2_image %}
-                        <div class="image-stage">
-                            <label>Transition 2</label>
-                            <img src="{{ url_for('serve_image', filename=image.transition2_image) }}" alt="Transition 2">
+                            <label>2. Transition</label>
+                            <img src="{{ url_for('serve_image', filename=image.transition1_image) }}" alt="Transition">
                         </div>
                         {% endif %}
                         {% if image.final_dog_image %}
                         <div class="image-stage">
-                            <label>Final Dog</label>
-                            <img src="{{ url_for('serve_image', filename=image.final_dog_image) }}" alt="Final Dog">
+                            <label>3. Final</label>
+                            <img src="{{ url_for('serve_image', filename=image.final_dog_image) }}" alt="Final">
+                        </div>
+                        {% endif %}
+                        {% if image.transition2_image %}
+                        <div class="image-stage">
+                            <label>4. Full Dog</label>
+                            <img src="{{ url_for('serve_image', filename=image.transition2_image) }}" alt="Full Dog">
                         </div>
                         {% endif %}
                     </div>

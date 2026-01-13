@@ -98,50 +98,39 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function displayNewImage(data) {
+        // Only display if all 4 images are ready
+        const images = data.images || {};
+        if (!images.original || !images.transition1 || !images.final || !images.full_dog) {
+            console.log('Waiting for all images to be generated...');
+            return; // Don't display until all images are ready
+        }
+        
         // Create new image card
         const imageCard = document.createElement('div');
         imageCard.className = 'image-card';
         
         const breed = data.breed || 'Unknown';
-        const images = data.images || {};
         
+        // Display images in order 1->2->3->4 from left to right
         let imageStagesHTML = `
             <h4>Breed: ${breed}</h4>
             <div class="image-stages">
                 <div class="image-stage">
-                    <label>Original</label>
-                    <img src="${images.original || ''}" alt="Original" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Crect fill=\'%23ddd\' width=\'200\' height=\'200\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%23999\'%3ELoading...%3C/text%3E%3C/svg%3E'">
+                    <label>1. Original</label>
+                    <img src="${images.original}" alt="Original">
                 </div>
-        `;
-        
-        if (images.transition1) {
-            imageStagesHTML += `
                 <div class="image-stage">
-                    <label>Transition 1</label>
-                    <img src="${images.transition1}" alt="Transition 1" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Crect fill=\'%23ddd\' width=\'200\' height=\'200\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%23999\'%3ELoading...%3C/text%3E%3C/svg%3E'">
+                    <label>2. Transition</label>
+                    <img src="${images.transition1}" alt="Transition">
                 </div>
-            `;
-        }
-        
-        if (images.transition2) {
-            imageStagesHTML += `
                 <div class="image-stage">
-                    <label>Transition 2</label>
-                    <img src="${images.transition2}" alt="Transition 2" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Crect fill=\'%23ddd\' width=\'200\' height=\'200\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%23999\'%3ELoading...%3C/text%3E%3C/svg%3E'">
+                    <label>3. Final</label>
+                    <img src="${images.final}" alt="Final">
                 </div>
-            `;
-        }
-        
-        if (images.final) {
-            imageStagesHTML += `
                 <div class="image-stage">
-                    <label>Final Dog</label>
-                    <img src="${images.final}" alt="Final Dog" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Crect fill=\'%23ddd\' width=\'200\' height=\'200\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%23999\'%3ELoading...%3C/text%3E%3C/svg%3E'">
+                    <label>4. Full Dog</label>
+                    <img src="${images.full_dog}" alt="Full Dog">
                 </div>
-            `;
-        }
-        
-        imageStagesHTML += `
             </div>
             <p class="image-date">Just now</p>
         `;

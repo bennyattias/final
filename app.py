@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 import database
-import image_generator
+import openai_generator
 from datetime import datetime
 
 # Load environment variables from .env file
@@ -138,25 +138,34 @@ def upload():
         # Save original image
         file.save(filepath)
         
-        # Analyze breed (simplified - in production use proper vision model)
+        # Analyze breed using OpenAI GPT-4 Vision
         print(f"Analyzing breed for image: {filepath}")
-        breed = image_generator.analyze_dog_breed(filepath)
+        breed = openai_generator.analyze_dog_breed(filepath)
         print(f"Detected breed: {breed}")
         
-        # Generate transformation images
-        print("Starting image generation...")
-        trans1_path, trans2_path, final_path = image_generator.generate_transformation_images(
+        # Generate transformation images using DALL-E 3
+        print("Starting image generation with DALL-E 3...")
+        trans1_path, final_path, full_dog_path = openai_generator.generate_transformation_images(
             filepath, breed, current_user.id, timestamp
         )
         
-        print(f"Generated images - Trans1: {trans1_path}, Trans2: {trans2_path}, Final: {final_path}")
+        print(f"Generated images - Trans1: {trans1_path}, Final: {final_path}, Full Dog: {full_dog_path}")
         
         # Check if files actually exist
         trans1_exists = trans1_path and os.path.exists(trans1_path)
-        trans2_exists = trans2_path and os.path.exists(trans2_path)
         final_exists = final_path and os.path.exists(final_path)
+        full_dog_exists = full_dog_path and os.path.exists(full_dog_path)
+        original_exists = os.path.exists(filepath)
         
-        print(f"Files exist - Trans1: {trans1_exists}, Trans2: {trans2_exists}, Final: {final_exists}")
+        print(f"Files exist - Original: {original_exists}, Trans1: {trans1_exists}, Final: {final_exists}, Full Dog: {full_dog_exists}")
+        
+        # Only return response if all 4 images are ready
+        if not (original_exists and trans1_exists and final_exists and full_dog_exists):
+            print("WARNING: Not all images were generated successfully")
+            return jsonify({
+                'success': False,
+                'error': 'Some images failed to generate. Please try again.'
+            }), 500
         
         # Save to database
         image_id = database.save_image_set(
@@ -164,20 +173,20 @@ def upload():
             filename,
             breed,
             os.path.basename(trans1_path) if trans1_exists else None,
-            os.path.basename(trans2_path) if trans2_exists else None,
-            os.path.basename(final_path) if final_exists else None
+            os.path.basename(final_path) if final_exists else None,
+            os.path.basename(full_dog_path) if full_dog_exists else None
         )
         
-        # Return JSON response with image URLs
+        # Return JSON response with image URLs (all 4 images are ready)
         return jsonify({
             'success': True,
             'image_id': image_id,
             'breed': breed,
             'images': {
                 'original': url_for('serve_image', filename=filename),
-                'transition1': url_for('serve_image', filename=os.path.basename(trans1_path)) if trans1_exists else None,
-                'transition2': url_for('serve_image', filename=os.path.basename(trans2_path)) if trans2_exists else None,
-                'final': url_for('serve_image', filename=os.path.basename(final_path)) if final_exists else None
+                'transition1': url_for('serve_image', filename=os.path.basename(trans1_path)),
+                'final': url_for('serve_image', filename=os.path.basename(final_path)),
+                'full_dog': url_for('serve_image', filename=os.path.basename(full_dog_path))
             }
         })
     
